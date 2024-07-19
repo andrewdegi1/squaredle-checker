@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squaredle Puzzle Analyzer</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --background-color: #f5f7fa;
+            --text-color: #333;
+            --border-color: #e1e4e8;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: var(--primary-color);
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        textarea {
+            height: 200px;
+            resize: vertical;
+        }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #3a7bc8;
+        }
+        #results {
+            margin-top: 30px;
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 20px;
+        }
+        .result-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .score {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Squaredle Puzzle Analyzer</h1>
+    <h2>Puzzle Database (CSV)</h2>
+    <textarea id="puzzleDatabase" placeholder="Enter puzzles, one per line"></textarea>
+    <h2>Puzzle to Analyze</h2>
+    <input type="text" id="puzzleToCheck" placeholder="Enter 16-letter puzzle to analyze">
+    <button onclick="analyzePuzzle()">Analyze Puzzle</button>
+    <div id="results"></div>
+</div>
+
+<script>
+    const dictionary = new Set(['CAT', 'DOG', 'BIRD', 'MOUSE', 'SUN', 'MOON', 'STAR', 'TREE', 'LEAF', 'BOOK', 'PAGE', 'READ', 'WRITE', 'RAIN', 'BOW', 'COLOR', 'OCEAN', 'WAVE', 'SAND', 'MUSIC', 'NOTE', 'SONG', 'CLOCK', 'TIME', 'HOUR', 'FIRE', 'FLAME', 'ASH', 'SMOKE', 'SNOW', 'FLAKE', 'WINTER', 'ICE', 'FLOWER', 'PETAL', 'ROSE', 'MOUNTAIN', 'PEAK', 'CLIMB', 'RIVER', 'STREAM', 'BANK', 'CAKE', 'SWEET', 'LAMP', 'SHADE', 'LIGHT', 'PAINT', 'BRUSH', 'CANVAS']);
+
+    function findWords(puzzle) {
+        const grid = [
+            puzzle.slice(0, 4).split(''),
+            puzzle.slice(4, 8).split(''),
+            puzzle.slice(8, 12).split(''),
+            puzzle.slice(12, 16).split('')
+        ];
+        const words = new Set();
+        const directions = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1], [0, 1],
+            [1, -1], [1, 0], [1, 1]
+        ];
+
+        function dfs(x, y, word, visited) {
+            if (word.length >= 3 && dictionary.has(word)) {
+                words.add(word);
+            }
+            if (word.length >= 16) return;
+
+            for (const [dx, dy] of directions) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && nx < 4 && ny >= 0 && ny < 4 && !visited[nx][ny]) {
+                    visited[nx][ny] = true;
+                    dfs(nx, ny, word + grid[nx][ny], visited);
+                    visited[nx][ny] = false;
+                }
+            }
+        }
+
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                const visited = Array(4).fill().map(() => Array(4).fill(false));
+                visited[i][j] = true;
+                dfs(i, j, grid[i][j], visited);
+            }
+        }
+
+        return Array.from(words);
+    }
+
+    function calculateComplexity(puzzle) {
+        const uniqueLetters = new Set(puzzle).size;
+        const vowels = (puzzle.match(/[AEIOU]/g) || []).length;
+        const consonants = 16 - vowels;
+        const words = findWords(puzzle);
+        return (uniqueLetters * 2) + (consonants - vowels) + (words.length / 2);
+    }
+
+    function letterSimilarity(a, b) {
+        let matches = 0;
+        for (let i = 0; i < a.length; i++) {
+            if (a[i] === b[i]) matches++;
+        }
+        return matches / a.length;
+    }
+
+    function wordSimilarity(wordsA, wordsB) {
+        const setA = new Set(wordsA);
+        const setB = new Set(wordsB);
+        const intersection = new Set([...setA].filter(x => setB.has(x)));
+        const union = new Set([...setA, ...setB]);
+        return intersection.size / union.size;
+    }
+
+    function analyzePuzzle() {
+        const database = document.getElementById('puzzleDatabase').value.split('\n').filter(p => p.length === 16);
+        const currentPuzzle = document.getElementById('puzzleToCheck').value.toUpperCase();
+
+        if (currentPuzzle.length !== 16) {
+            alert("Please enter a 16-letter puzzle to analyze.");
+            return;
+        }
+
+        const currentComplexity = calculateComplexity(currentPuzzle);
+        const currentWords = findWords(currentPuzzle);
+
+        let results = database.map((puzzle, index) => {
+            const letterSim = letterSimilarity(currentPuzzle, puzzle.toUpperCase());
+            const puzzleComplexity = calculateComplexity(puzzle.toUpperCase());
+            const puzzleWords = findWords(puzzle.toUpperCase());
+            const wordSim = wordSimilarity(currentWords, puzzleWords);
+            const baseScore = 100 - (index / database.length * 100);
+            const complexityDiff = Math.abs(currentComplexity - puzzleComplexity);
+            const weightedSim = letterSim * 0.3 + wordSim * 0.5 + (1 - complexityDiff / 16) * 0.2;
+            const finalScore = Math.round(weightedSim * baseScore);
+            return { puzzle, finalScore, letterSim, wordSim, puzzleComplexity, wordCount: puzzleWords.length };
+        });
+
+        results.sort((a, b) => b.finalScore - a.finalScore);
+
+        let output = `<h3>Analysis of Puzzle: ${currentPuzzle}</h3>`;
+        output += `<p>Complexity Score: <span class="score">${currentComplexity.toFixed(2)}</span></p>`;
+        output += `<p>Words Found: ${currentWords.length}</p>`;
+        output += "<h3>Top 5 Similar Puzzles:</h3>";
+        for (let i = 0; i < Math.min(5, results.length); i++) {
+            output += `<div class="result-item">`;
+            output += `<p><strong>${i + 1}. Puzzle:</strong> ${results[i].puzzle}</p>`;
+            output += `<p>Final Score: <span class="score">${results[i].finalScore}</span></p>`;
+            output += `<p>Letter Similarity: ${(results[i].letterSim * 100).toFixed(2)}%</p>`;
+            output += `<p>Word Similarity: ${(results[i].wordSim * 100).toFixed(2)}%</p>`;
+            output += `<p>Complexity: ${results[i].puzzleComplexity.toFixed(2)}</p>`;
+            output += `<p>Words Found: ${results[i].wordCount}</p>`;
+            output += `</div>`;
+        }
+
+        document.getElementById('results').innerHTML = output;
+    }
+</script>
+</body>
+</html>
